@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  password_hash   String?   // null para usuarios que se registraron con Google
+  google_id       String?   @unique
+  nombre          String
+  activo          Boolean   @default(true)
+  last_logout_at  DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  tenants         Tenant[]
+
+  @@map("users")
+}
+
+model Tenant {
+  id              String         @id @default(uuid())
+  user_id         String
+  nombre          String
+  ig_page_id      String         @unique
+  fb_page_id      String?        @unique
+  owner_ig_id     String
+  system_prompt   String         @db.Text
+  bot_name        String         @default("Asistente")
+  commission_pct  Float          @default(5.0)
+  access_token    String         @db.Text
+  crm_token       String         @unique @default(uuid())
+  activo          Boolean        @default(true)
+  created_at      DateTime       @default(now())
+  updated_at      DateTime       @updatedAt
+  user            User           @relation(fields: [user_id], references: [id])
+  commissions     Commission[]
+  conversations   Conversation[]
+  orders          Order[]
+
+  @@map("tenants")
+}
+
+model Conversation {
+  id         String             @id @default(uuid())
+  tenant_id  String
+  user_ig_id String
+  canal      Canal
+  estado     ConversationEstado @default(activa)
+  created_at DateTime           @default(now())
+  updated_at DateTime           @updatedAt
+  tenant     Tenant             @relation(fields: [tenant_id], references: [id])
+  messages   Message[]
+  orders     Order[]
+
+  @@index([tenant_id, user_ig_id, estado])
+  @@map("conversations")
+}
+
+model Message {
+  id              String       @id @default(uuid())
+  conversation_id String
+  tenant_id       String
+  role            MessageRole
+  content         String
+  created_at      DateTime     @default(now())
+  conversation    Conversation @relation(fields: [conversation_id], references: [id])
+
+  @@index([conversation_id, created_at])
+  @@map("messages")
+}
+
+model Order {
+  id                      String       @id @default(uuid())
+  tenant_id               String
+  conversation_id         String
+  product_id              String
+  codigo                  String       @unique
+  estado                  OrderEstado  @default(pendiente)
+  precio                  Float
+  comprobante_url         String?
+  comprobante_validado_ia Boolean      @default(false)
+  created_at              DateTime     @default(now())
+  updated_at              DateTime     @updatedAt
+  commissions             Commission[]
+  conversation            Conversation @relation(fields: [conversation_id], references: [id])
+  tenant                  Tenant       @relation(fields: [tenant_id], references: [id])
+
+  @@index([tenant_id, estado])
+  @@map("orders")
+}
+
+model Commission {
+  id         String           @id @default(uuid())
+  order_id   String
+  tenant_id  String
+  monto      Float
+  estado     CommissionEstado @default(pendiente_cobro)
+  created_at DateTime         @default(now())
+  order      Order            @relation(fields: [order_id], references: [id])
+  tenant     Tenant           @relation(fields: [tenant_id], references: [id])
+
+  @@map("commissions")
+}
+
+enum Canal {
+  instagram
+  facebook
+}
+
+enum ConversationEstado {
+  activa
+  archivada
+}
+
+enum MessageRole {
+  user
+  assistant
+}
+
+enum OrderEstado {
+  pendiente
+  comprobante_recibido
+  verificado
+  rechazado
+  archivado
+}
+
+enum CommissionEstado {
+  pendiente_cobro
+  cobrado
+}

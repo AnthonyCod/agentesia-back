@@ -1,0 +1,6 @@
+{
+  "watch": ["src"],
+  "ext": "ts",
+  "exec": "~/.bun/bin/bun src/main.ts",
+  "ignore": ["dist", "node_modules"]
+}
