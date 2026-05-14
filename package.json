@@ -5,9 +5,10 @@
   "private": true,
   "scripts": {
     "dev": "nodemon --exec ~/.bun/bin/bun src/main.ts",
-    "build": "tsc",
+    "build": "bunx prisma generate && tsc",
     "start": "bun dist/main.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "postinstall": "bunx prisma generate"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
