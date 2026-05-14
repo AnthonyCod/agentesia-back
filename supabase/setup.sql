@@ -1,10 +1,15 @@
 -- Ejecutar este archivo en Supabase: Dashboard → SQL Editor → New query → pegar y correr
 
--- Habilitar la extensión pgvector (necesaria para el tipo vector y la búsqueda semántica)
 create extension if not exists vector;
 
--- Tabla de productos con soporte de embeddings
-create table if not exists products (
+-- Limpiar versión anterior si existe
+drop index if exists products_embedding_idx;
+drop index if exists products_tenant_id_idx;
+drop function if exists match_products;
+drop table if exists products;
+
+-- Tabla de productos con 512 dimensiones (3x menos storage que 1536, misma calidad para ropa)
+create table products (
   id          uuid primary key default gen_random_uuid(),
   tenant_id   uuid not null,
   nombre      text not null,
@@ -12,22 +17,18 @@ create table if not exists products (
   precio      numeric(10, 2) not null,
   stock       integer not null default 0,
   atributos   jsonb default '{}',
-  embedding   vector(1536),   -- dimensiones de text-embedding-3-small de OpenAI
+  embedding   vector(512),
   updated_at  timestamp with time zone default now()
 );
 
--- Índice para filtrar por tenant rápidamente
-create index if not exists products_tenant_id_idx on products(tenant_id);
+create index products_tenant_id_idx on products(tenant_id);
 
--- Índice vectorial para acelerar la búsqueda semántica por similitud coseno
-create index if not exists products_embedding_idx
+create index products_embedding_idx
   on products using ivfflat (embedding vector_cosine_ops)
   with (lists = 100);
 
--- Función RPC que usa el bot para buscar productos similares al mensaje del cliente.
--- Filtra por tenant_id y ordena por similitud coseno descendente.
 create or replace function match_products(
-  query_embedding   vector(1536),
+  query_embedding   vector(512),
   match_count       int,
   filter_tenant_id  uuid
 )
